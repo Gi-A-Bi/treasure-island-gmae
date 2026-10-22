@@ -131,25 +131,54 @@ function startGame() {
   S.cur = 0; S.busy = false; S.used = new Set();
   buildBoard(); buildPieces(); renderTop();
   showScreen('screen-game');
-  requestAnimationFrame(() => { placeAll(false); setTimeout(() => placeAll(false), 300); });
+  placeAll(false);
+  CAM.overview = true; $('#btn-map').classList.add('on');
+  requestAnimationFrame(() => { camera(true); setTimeout(() => follow(S.players[0]), 1600); });
   bubble(`${S.players[0].name}, 주사위를 굴려 보세요!`);
   $('#btn-roll').disabled = false;
 }
 
+// ───────── 지도 (월드 좌표, 1280 × 3500) ─────────
+const WORLD = { w: 1280, h: 3500, sceneH: 700 };
+const ZONES = ['숲', '해변', '동굴', '화산', '보물 동굴'];
+const ROUTE = (() => {
+  const pts = [], n = CELL_TYPES.length;
+  const top = 150, bottom = WORLD.h - 150;
+  for (let i = 0; i < n; i++) {
+    const y = top + (bottom - top) * i / (n - 1);
+    const x = 640 + 430 * Math.sin(i * 0.92 + 0.6) + 40 * Math.sin(i * 2.3);
+    pts.push({ x: Math.round(x), y: Math.round(y) });
+  }
+  return pts;
+})();
+
 function buildBoard() {
-  const bands = $$('.band');
-  bands.forEach(b => b.innerHTML = '');
+  const world = $('#world');
+  $$('.scene', world).forEach((sc, i) => { sc.style.top = (i * WORLD.sceneH - 100) + 'px'; });
+  $$('.zone-label', world).forEach(z => z.remove());
+  ZONES.forEach((z, i) => world.insertAdjacentHTML('beforeend', `<div class="zone-label" style="top:${i * WORLD.sceneH + 60}px">${z}</div>`));
+  const wrap = $('#cells'); wrap.innerHTML = '';
   CELL_TYPES.forEach((t, i) => {
-    const row = Math.floor(i / 6);
-    const band = bands[row];
     const d = document.createElement('div');
     d.className = `cell ${t}`; d.dataset.i = i;
+    d.style.left = ROUTE[i].x + 'px'; d.style.top = ROUTE[i].y + 'px';
     if (t === 'start') d.textContent = '출발';
     else if (t === 'goal') d.innerHTML = `<img src="images/treasure_closed.png" alt="보물">`;
     else if (CELL_ICON[t]) d.innerHTML = `<img src="${CELL_ICON[t]}" alt="">`;
-    d.insertAdjacentHTML('beforeend', `<span class="num">${i}</span>`);
-    if (row % 2 === 1) band.prepend(d); else band.append(d);
+    if (t !== 'start' && t !== 'goal') d.insertAdjacentHTML('beforeend', `<span class="num">${i}</span>`);
+    wrap.append(d);
   });
+  drawTrail();
+}
+function drawTrail() {
+  const P = ROUTE;
+  let d = `M${P[0].x},${P[0].y}`;
+  for (let i = 0; i < P.length - 1; i++) {
+    const p0 = P[i - 1] || P[i], p1 = P[i], p2 = P[i + 1], p3 = P[i + 2] || p2;
+    d += ` C${p1.x + (p2.x - p0.x) / 6},${p1.y + (p2.y - p0.y) / 6} ${p2.x - (p3.x - p1.x) / 6},${p2.y - (p3.y - p1.y) / 6} ${p2.x},${p2.y}`;
+  }
+  $('#trail').setAttribute('viewBox', `0 0 ${WORLD.w} ${WORLD.h}`);
+  ['#road-edge', '#road', '#road-dash'].forEach(s => $(s).setAttribute('d', d));
 }
 function buildPieces() {
   const wrap = $('#pieces'); wrap.innerHTML = '';
@@ -161,26 +190,41 @@ function buildPieces() {
     wrap.append(d);
   });
 }
-function cellCenter(i) {
-  const cell = $(`.cell[data-i="${i}"]`), board = $('#board');
-  const r = cell.getBoundingClientRect(), b = board.getBoundingClientRect();
-  return { x: r.left - b.left + r.width / 2, y: r.top - b.top + r.height * .55 };
-}
 function placePiece(p, animate = true) {
-  const el = $('#piece' + p.idx); const c = cellCenter(p.pos);
+  const el = $('#piece' + p.idx); const c = ROUTE[p.pos];
   if (!animate) el.style.transition = 'none';
   el.style.left = c.x + 'px'; el.style.top = c.y + 'px';
   if (!animate) { el.offsetHeight; el.style.transition = ''; }
 }
-function sizeCells() {
-  const band = $('.band'); if (!band) return;
-  const r = band.getBoundingClientRect();
-  const size = Math.floor(Math.min(r.height * .78, r.width / 6 * .82));
-  $('#board').style.setProperty('--cell', size + 'px');
-  $('#board').style.setProperty('--piece', Math.round(size * 1.15) + 'px');
+function placeAll(animate) { S.players.forEach(p => placePiece(p, animate)); }
+
+// 카메라: 현재 탐험가를 따라가거나(기본) 전체 지도를 보여줌
+const CAM = { overview: false, target: null };
+function camera(snap = false) {
+  const vp = $('#viewport').getBoundingClientRect(); if (!vp.width) return;
+  const world = $('#world');
+  let s, tx, ty;
+  if (CAM.overview) {
+    s = Math.min(vp.width / WORLD.w, vp.height / WORLD.h);
+    tx = (vp.width - WORLD.w * s) / 2; ty = (vp.height - WORLD.h * s) / 2;
+  } else {
+    s = Math.min(Math.max(vp.width / WORLD.w, 0.5), 0.85);
+    const pt = CAM.target || ROUTE[0];
+    tx = (vp.width - WORLD.w * s) / 2;
+    ty = vp.height / 2 - pt.y * s;
+    ty = Math.min(0, Math.max(vp.height - WORLD.h * s, ty));
+  }
+  world.classList.toggle('snap', snap);
+  world.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
+  if (snap) { world.offsetHeight; world.classList.remove('snap'); }
 }
-function placeAll(animate) { sizeCells(); S.players.forEach(p => placePiece(p, animate)); }
-window.addEventListener('resize', () => { if ($('#screen-game').classList.contains('active')) placeAll(false); });
+function follow(p, snap = false) { CAM.target = ROUTE[p.pos]; CAM.overview = false; $('#btn-map').classList.remove('on'); camera(snap); }
+function toggleOverview() {
+  CAM.overview = !CAM.overview; $('#btn-map').classList.toggle('on', CAM.overview); SFX.click();
+  if (!CAM.overview) CAM.target = ROUTE[S.players[S.cur].pos];
+  camera();
+}
+window.addEventListener('resize', () => { if ($('#screen-game').classList.contains('active')) camera(true); });
 
 function renderTop() {
   const p = S.players[S.cur];
@@ -216,7 +260,7 @@ async function movePiece(p, steps) {
     if (p.pos + dir < 0 || p.pos + dir > LAST) break;
     p.pos += dir;
     el.classList.remove('hop'); el.offsetHeight; el.classList.add('hop');
-    SFX.hop(); placePiece(p);
+    SFX.hop(); placePiece(p); CAM.target = ROUTE[p.pos]; if (!CAM.overview) camera();
     const c = $(`.cell[data-i="${p.pos}"]`); c.classList.remove('glow'); c.offsetHeight; c.classList.add('glow');
     await wait(340);
   }
@@ -238,7 +282,7 @@ async function landOn(p, chained = false) {
 function endTurn(again = false) {
   if (!again) S.cur = (S.cur + 1) % S.players.length;
   const p = S.players[S.cur];
-  renderTop();
+  renderTop(); follow(p);
   bubble(again ? `${p.name}, 한 번 더 굴려요!` : `${p.name}, 주사위를 굴려 보세요!`);
   S.busy = false; $('#btn-roll').disabled = false;
 }
@@ -454,6 +498,7 @@ $('#btn-start').addEventListener('click', () => { SFX.click(); showScreen('scree
 $('#btn-howto').addEventListener('click', () => { SFX.click(); howto(); });
 $('#btn-go').addEventListener('click', () => { SFX.click(); startGame(); });
 $('#btn-roll').addEventListener('click', roll);
+$('#btn-map').addEventListener('click', toggleOverview);
 $('#btn-again').addEventListener('click', () => { SFX.click(); showScreen('screen-setup'); });
 $$('.btn-home').forEach(b => b.addEventListener('click', () => { SFX.click(); closeModal(); showScreen('screen-title'); }));
 $('.btn-sound').addEventListener('click', e => { S.sound = !S.sound; e.currentTarget.textContent = S.sound ? '🔊' : '🔇'; if (S.sound) SFX.click(); });

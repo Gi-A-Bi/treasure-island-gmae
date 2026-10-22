@@ -75,14 +75,19 @@
   </header>
 
   <div class="board-wrap">
-    <div class="board" id="board">
-      <div class="band zone-forest" data-zone="숲"></div>
-      <div class="band zone-beach" data-zone="해변"></div>
-      <div class="band zone-cave" data-zone="동굴"></div>
-      <div class="band zone-volcano" data-zone="화산"></div>
-      <div class="band zone-treasure" data-zone="보물 동굴"></div>
-      <div class="pieces" id="pieces"></div>
+    <div class="viewport" id="viewport">
+      <div class="world" id="world">
+        <div class="scene" style="background-image:url('images/bg_forest.jpg')"></div>
+        <div class="scene" style="background-image:url('images/bg_beach.jpg')"></div>
+        <div class="scene" style="background-image:url('images/bg_cave.jpg')"></div>
+        <div class="scene" style="background-image:url('images/bg_volcano.jpg')"></div>
+        <div class="scene" style="background-image:url('images/bg_title.jpg')"></div>
+        <svg class="trail" id="trail" aria-hidden="true"><path class="road-edge" id="road-edge"/><path class="road" id="road"/><path class="road-dash" id="road-dash"/></svg>
+        <div class="cells" id="cells"></div>
+        <div class="pieces" id="pieces"></div>
+      </div>
     </div>
+    <button class="btn-round btn-map" id="btn-map" aria-label="전체 지도 보기">🗺</button>
   </div>
 
   <footer class="bottombar">
