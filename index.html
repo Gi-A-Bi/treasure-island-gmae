@@ -23,6 +23,7 @@
     </div>
   </div>
   <button id="btn-howto" class="btn-round corner-tl" aria-label="게임 방법">?</button>
+  <button id="btn-rank" class="btn-round corner-tr" aria-label="랭킹 보기">🏆</button>
 </section>
 
 <!-- ───────── 설정 / 캐릭터 선택 ───────── -->
@@ -32,6 +33,12 @@
     <div class="seg" id="seg-players">
       <button data-n="1" class="on">혼자서</button>
       <button data-n="2">둘이서</button>
+    </div>
+
+    <h2>닉네임을 정해요</h2>
+    <div class="nick-row" id="nick-row">
+      <input id="nick1" class="nick" type="text" maxlength="8" placeholder="탐험가 1 닉네임" autocomplete="off">
+      <input id="nick2" class="nick" type="text" maxlength="8" placeholder="탐험가 2 닉네임" autocomplete="off" hidden>
     </div>
 
     <h2>캐릭터를 골라요</h2>
@@ -108,6 +115,7 @@
     <div class="result-players" id="result-players"></div>
     <div class="result-btns">
       <button id="btn-again" class="btn-big btn-primary">다시 하기</button>
+      <button id="btn-rank2" class="btn-big btn-rank">🏆 랭킹</button>
       <button class="btn-big btn-home">처음으로</button>
     </div>
   </div>

@@ -2,6 +2,10 @@
 (() => {
 'use strict';
 
+// ───────── 랭킹 서버 설정 ─────────
+// 구글 시트(Apps Script 웹앱) 주소를 넣으면 반 전체가 공유하는 랭킹이 됩니다. 비워두면 이 기기 안에서만 기록돼요.
+const RANK_URL = '';
+
 // ───────── 데이터 ─────────
 const CHARS = [
   { id:'cat',     name:'고양이 선장', img:'images/char_cat.png' },
@@ -93,7 +97,13 @@ function buildSetup() {
     SFX.click();
     $$('#seg-players button').forEach(x => x.classList.toggle('on', x === b));
     S.playerCount = +b.dataset.n; S.picks = [null, null]; renderPicks();
+    $('#nick2').hidden = S.playerCount === 1;
   });
+  try {
+    const saved = JSON.parse(localStorage.getItem('ti_nicks') || '[]');
+    if (saved[0]) $('#nick1').value = saved[0]; if (saved[1]) $('#nick2').value = saved[1];
+  } catch (e) {}
+  $$('.nick').forEach(i => i.addEventListener('input', renderPicks));
   $('#seg-level').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     SFX.click();
@@ -111,10 +121,12 @@ function renderPicks() {
     if (S.picks[0] === i) c.insertAdjacentHTML('beforeend', '<span class="tag">탐험가 1</span>');
     if (S.picks[1] === i) c.insertAdjacentHTML('beforeend', '<span class="tag">탐험가 2</span>');
   });
-  const need = S.playerCount === 1 ? S.picks[0] !== null : S.picks[0] !== null && S.picks[1] !== null;
+  const nickOk = $('#nick1').value.trim() && (S.playerCount === 1 || $('#nick2').value.trim());
+  const need = nickOk && (S.playerCount === 1 ? S.picks[0] !== null : S.picks[0] !== null && S.picks[1] !== null);
   $('#btn-go').disabled = !need;
   const hint = $('#pick-hint');
-  if (S.playerCount === 1) hint.textContent = S.picks[0] === null ? '캐릭터를 하나 골라요' : '좋아요! 출발 버튼을 눌러요';
+  if (!nickOk) hint.textContent = '먼저 닉네임을 써 주세요';
+  else if (S.playerCount === 1) hint.textContent = S.picks[0] === null ? '캐릭터를 하나 골라요' : '좋아요! 출발 버튼을 눌러요';
   else hint.textContent = S.picks[0] === null ? '탐험가 1의 캐릭터를 골라요' : S.picks[1] === null ? '탐험가 2의 캐릭터를 골라요' : '좋아요! 출발 버튼을 눌러요';
 }
 
@@ -124,9 +136,11 @@ function startGame() {
   S.types = $$('.types input:checked').map(i => i.dataset.type);
   if (!S.types.length) S.types = Object.keys(TYPE_NAME);
   S.players = [];
+  const nicks = [$('#nick1').value.trim(), $('#nick2').value.trim()];
+  try { localStorage.setItem('ti_nicks', JSON.stringify(nicks)); } catch (e) {}
   for (let p = 0; p < S.playerCount; p++) {
     const c = CHARS[S.picks[p]];
-    S.players.push({ idx: p, name: S.playerCount === 1 ? c.name : `탐험가 ${p + 1}`, char: c, pos: 0, stars: 0, skip: false, correct: 0, tries: 0 });
+    S.players.push({ idx: p, name: nicks[p] || c.name, char: c, pos: 0, stars: 0, skip: false, correct: 0, tries: 0, turns: 0 });
   }
   S.cur = 0; S.busy = false; S.used = new Set();
   buildBoard(); buildPieces(); renderTop();
@@ -245,7 +259,7 @@ function renderTop() {
 async function roll() {
   if (S.busy) return;
   S.busy = true; $('#btn-roll').disabled = true;
-  const p = S.players[S.cur];
+  const p = S.players[S.cur]; p.turns++;
   const dice = $('#dice'), face = $('#dice-face');
   face.innerHTML = '<i></i>'.repeat(9);
   dice.classList.add('rolling');
@@ -451,6 +465,61 @@ async function doMini(p) {
   }
 }
 
+// ───────── 점수 & 랭킹 ─────────
+// 점수 = 별 × 10 + 빨리 도착 보너스(40 - 굴린 횟수, 최소 0) + 퀴즈 정답 × 2
+function score(p) { return p.stars * 10 + Math.max(0, 40 - p.turns) + p.correct * 2; }
+function loadLocal() { try { return JSON.parse(localStorage.getItem('ti_rank') || '[]'); } catch (e) { return []; } }
+function saveLocal(list) { try { localStorage.setItem('ti_rank', JSON.stringify(list.slice(0, 200))); } catch (e) {} }
+function addRecord(rec) {
+  const list = loadLocal(); list.push(rec); saveLocal(list);
+  if (RANK_URL) {
+    fetch(RANK_URL, { method: 'POST', body: JSON.stringify(rec), headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
+  }
+}
+function bestPer(list) {
+  const m = new Map();
+  list.forEach(r => { const k = r.nick; if (!m.has(k) || m.get(k).score < r.score) m.set(k, r); });
+  return [...m.values()].sort((a, b) => b.score - a.score || b.stars - a.stars || a.turns - b.turns);
+}
+async function fetchShared() {
+  if (!RANK_URL) return null;
+  try { const r = await fetch(RANK_URL + '?action=top&t=' + Date.now()); const j = await r.json(); return Array.isArray(j) ? j : null; }
+  catch (e) { return null; }
+}
+function rankRows(list, meNick) {
+  if (!list.length) return '<p class="rank-note">아직 기록이 없어요. 첫 번째 탐험가가 되어 보세요!</p>';
+  return '<ol class="rank-list">' + list.slice(0, 10).map((r, i) => {
+    const ch = CHARS.find(c => c.id === r.char);
+    return `<li class="${r.nick === meNick ? 'me' : ''}"><span class="no">${i + 1}</span>
+      <span class="nm">${ch ? `<img src="${ch.img}" alt="">` : ''}${escapeHtml(r.nick)}</span>
+      <span class="pt">${r.score}점 <small>⭐${r.stars} · ${r.turns}턴</small></span></li>`;
+  }).join('') + '</ol>';
+}
+function escapeHtml(s) { return String(s).replace(/[&<>"']/g, c => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[c])); }
+async function showRanking(meNick = null) {
+  const card = openModal(`
+    <h3>🏆 탐험가 랭킹</h3>
+    <div class="rank-tabs" id="rank-tabs"></div>
+    <div id="rank-body"><p class="rank-note">불러오는 중…</p></div>
+    <button class="btn-big" id="btn-ok">닫기</button>`);
+  waitButton('#btn-ok', card).then(closeModal);
+  const local = bestPer(loadLocal());
+  const shared = await fetchShared();
+  const body = $('#rank-body', card), tabs = $('#rank-tabs', card);
+  if (shared) {
+    const sv = bestPer(shared);
+    tabs.innerHTML = '<button class="on" data-k="shared">우리 반</button><button data-k="local">이 기기</button>';
+    body.innerHTML = rankRows(sv, meNick);
+    tabs.addEventListener('click', e => {
+      const b = e.target.closest('button'); if (!b) return; SFX.click();
+      $$('button', tabs).forEach(x => x.classList.toggle('on', x === b));
+      body.innerHTML = rankRows(b.dataset.k === 'shared' ? sv : local, meNick);
+    });
+  } else {
+    body.innerHTML = rankRows(local, meNick) + (RANK_URL ? '<p class="rank-note">우리 반 랭킹을 불러오지 못해 이 기기 기록만 보여요.</p>' : '<p class="rank-note">이 기기에서 세운 기록이에요.</p>');
+  }
+}
+
 // ───────── 결과 ─────────
 function grade(stars) {
   if (stars >= 8) return { img: 'images/badge_3.png', name: '전설의 탐험가' };
@@ -466,13 +535,21 @@ async function finish(winner) {
   await wait(1600);
   const ranked = [...S.players].sort((a, b) => (b.pos - a.pos) || (b.stars - a.stars));
   $('#result-title').textContent = S.playerCount === 1 ? '보물을 찾았다!' : `${winner.name} 승리!`;
+  const prevBest = new Map(bestPer(loadLocal()).map(r => [r.nick, r.score]));
+  const today = new Date().toISOString().slice(0, 10);
+  S.players.forEach(q => { q.score = score(q); q.finished = q === winner; });
+  // 승리한 탐험가(도착한 사람)만 랭킹에 기록
+  addRecord({ nick: winner.name, char: winner.char.id, score: winner.score, stars: winner.stars, turns: winner.turns, correct: winner.correct, tries: winner.tries, level: S.level, date: today });
   $('#result-players').innerHTML = ranked.map((q, i) => {
     const g = grade(q.stars);
+    const isBest = q === winner && (!prevBest.has(q.name) || prevBest.get(q.name) < q.score);
     return `<div class="rp ${q === winner ? 'winner' : ''}" style="animation-delay:${.3 + i * .25}s">
       ${S.playerCount > 1 ? `<div class="rank">${i + 1}등</div>` : ''}
       <img class="ch" src="${q.char.img}" alt="">
-      <div class="nm">${q.name}</div>
-      <div class="st">⭐ ${q.stars}개 · 퀴즈 ${q.correct}/${q.tries}</div>
+      <div class="nm">${escapeHtml(q.name)}</div>
+      ${q === winner ? `<div class="score">${q.score}점</div>` : ''}
+      ${isBest ? '<div class="newbest">🎉 내 최고 기록!</div>' : ''}
+      <div class="st">⭐ ${q.stars}개 · 퀴즈 ${q.correct}/${q.tries} · ${q.turns}턴</div>
       <img class="bd" src="${g.img}" alt="">
       <div class="grade">${g.name}</div>
     </div>`;
@@ -496,6 +573,7 @@ function howto() {
       <li><img src="images/icon_luck.png" alt=""> 행운 칸: 좋은 일이 생겨요!</li>
       <li><img src="images/icon_trap.png" alt=""> 늪 칸: 퀴즈를 맞히면 탈출, 틀리면 2칸 뒤로!</li>
       <li>먼저 보물상자에 도착하면 승리! 별을 많이 모으면 더 높은 등급을 받아요.</li>
+      <li>🏆 점수 = 별 × 10 + 빨리 도착 보너스 + 정답 × 2. 닉네임으로 랭킹에 기록돼요!</li>
     </ol>
     <button class="btn-big" id="btn-ok">알겠어요!</button>`);
   waitButton('#btn-ok', card).then(closeModal);
@@ -504,6 +582,8 @@ function howto() {
 // ───────── 이벤트 연결 ─────────
 $('#btn-start').addEventListener('click', () => { SFX.click(); showScreen('screen-setup'); });
 $('#btn-howto').addEventListener('click', () => { SFX.click(); howto(); });
+$('#btn-rank').addEventListener('click', () => { SFX.click(); showRanking(); });
+$('#btn-rank2').addEventListener('click', () => { SFX.click(); const w = S.players.find(p => p.finished); showRanking(w ? w.name : null); });
 $('#btn-go').addEventListener('click', () => { SFX.click(); startGame(); });
 $('#btn-roll').addEventListener('click', roll);
 $('#btn-map').addEventListener('click', toggleOverview);

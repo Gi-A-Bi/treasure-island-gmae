@@ -59,6 +59,30 @@ img { pointer-events: none; }
 }
 .btn-round:active { transform: translateY(3px); box-shadow: none; }
 .corner-tl { position: absolute; top: 16px; left: 16px; z-index: 5; }
+.corner-tr { position: absolute; top: 16px; right: 16px; z-index: 5; }
+.nick-row { display: flex; gap: 10px; flex-wrap: wrap; justify-content: center; width: 100%; }
+.nick {
+  font-family: var(--font-title); font-size: 24px; padding: 10px 18px; border-radius: 999px; width: min(260px, 100%);
+  border: 3px solid #e4cfa6; background: #fff; color: var(--wood); text-align: center; outline: none;
+}
+.nick:focus { border-color: var(--sea); box-shadow: 0 0 0 4px rgba(53,182,217,.25); }
+.rank-list { list-style: none; margin: 10px 0; padding: 0; text-align: left; }
+.rank-list li { display: grid; grid-template-columns: 44px 1fr auto; align-items: center; gap: 10px; background: #fff; border-radius: 14px; padding: 8px 14px; margin-bottom: 6px; font-weight: 700; font-size: 20px; }
+.rank-list li .no { font-family: var(--font-title); font-size: 24px; color: var(--coral-dark); text-align: center; }
+.rank-list li .nm { font-family: var(--font-title); font-size: 22px; color: var(--wood); display: flex; align-items: center; gap: 8px; }
+.rank-list li .nm img { height: 36px; }
+.rank-list li .pt { color: var(--ink); white-space: nowrap; }
+.rank-list li .pt small { color: #8a6a44; font-size: 15px; }
+.rank-list li.me { background: #fff2b8; border: 3px solid var(--gold); }
+.rank-list li:nth-child(1) .no { color: #d4a000; } .rank-list li:nth-child(2) .no { color: #8a8f98; } .rank-list li:nth-child(3) .no { color: #a0623a; }
+.rank-note { font-size: 16px; color: #8a6a44; margin: 6px 0 0; }
+.rank-tabs { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.rank-tabs button { font-family: var(--font-title); font-size: 18px; padding: 6px 16px; border-radius: 999px; background: #fff; color: var(--wood); border: 3px solid #e4cfa6; }
+.rank-tabs button.on { background: var(--sea); color: #fff; border-color: var(--sea-dark); }
+.rp .score { font-family: var(--font-title); font-size: 30px; color: var(--coral-dark); }
+.rp .newbest { font-family: var(--font-title); font-size: 18px; color: #fff; background: var(--coral); padding: 2px 12px; border-radius: 999px; animation: pulse2 1s infinite; }
+@keyframes pulse2 { 0%,100% { transform: scale(1);} 50% { transform: scale(1.08);} }
+.result-btns .btn-rank { background: var(--gold); color: var(--ink); box-shadow: 0 6px 0 var(--gold-dark); }
 
 /* ─── 타이틀 ─── */
 #screen-title {
