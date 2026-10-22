@@ -362,7 +362,7 @@ async function doQuiz(p) {
     await wait(600); await movePiece(p, 2); await landOn(p, true);
   } else {
     el.classList.add('sad'); setTimeout(() => el.classList.remove('sad'), 600);
-    bubble('괜찮아요, 다음 기회에!'); await wait(600); endTurn();
+    bubble('아쉬워요! 2칸 뒤로…'); await wait(600); await movePiece(p, -2); endTurn();
   }
 }
 
@@ -491,7 +491,7 @@ function howto() {
     <h3>게임 방법</h3>
     <ol class="howto">
       <li>주사위를 굴려 나온 수만큼 말이 앞으로 가요.</li>
-      <li><img src="images/icon_quiz.png" alt=""> 퀴즈 칸: 문제를 맞히면 별 1개 + 2칸 보너스!</li>
+      <li><img src="images/icon_quiz.png" alt=""> 퀴즈 칸: 맞히면 별 1개 + 2칸 앞으로, 틀리면 2칸 뒤로!</li>
       <li><img src="images/icon_minigame.png" alt=""> 미니게임 칸: 성공하면 별 2개 + 3칸 보너스!</li>
       <li><img src="images/icon_luck.png" alt=""> 행운 칸: 좋은 일이 생겨요!</li>
       <li><img src="images/icon_trap.png" alt=""> 늪 칸: 퀴즈를 맞히면 탈출, 틀리면 2칸 뒤로!</li>
