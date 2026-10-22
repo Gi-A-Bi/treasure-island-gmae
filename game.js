@@ -11,7 +11,7 @@ const CHARS = [
   { id:'fox',     name:'여우 탐정',   img:'images/char_fox.png' },
   { id:'rabbit',  name:'보물 토끼',   img:'images/char_rabbit.png' },
 ];
-const CELL_TYPES = ['start','n','quiz','n','luck','quiz','mini','n','quiz','trap','n','quiz','luck','quiz','n','mini','quiz','n','trap','quiz','n','mini','quiz','luck','n','quiz','mini','quiz','n','goal'];
+const CELL_TYPES = ['start','n','quiz','n','luck','quiz','n','mini','quiz','n','trap','quiz','n','luck','quiz','mini','n','quiz','n','trap','quiz','n','mini','quiz','luck','n','quiz','n','mini','quiz','trap','n','quiz','luck','n','quiz','mini','n','quiz','n','trap','quiz','luck','n','quiz','mini','n','quiz','n','goal'];
 const CELL_ICON = { quiz:'images/icon_quiz.png', mini:'images/icon_minigame.png', luck:'images/icon_luck.png', trap:'images/icon_trap.png' };
 const TYPE_NAME = { pattern:'규칙 찾기', shape:'도형 패턴', logic:'논리 추론', common:'상식 퀴즈', word:'단어 퍼즐' };
 const LAST = CELL_TYPES.length - 1;
@@ -138,15 +138,15 @@ function startGame() {
   $('#btn-roll').disabled = false;
 }
 
-// ───────── 지도 (월드 좌표, 1280 × 3500) ─────────
-const WORLD = { w: 1280, h: 3500, sceneH: 700 };
+// ───────── 지도 (월드 좌표, 가로로 긴 섬 6000 × 720) ─────────
+const WORLD = { w: 7500, h: 720, sceneW: 1500 };
 const ZONES = ['숲', '해변', '동굴', '화산', '보물 동굴'];
 const ROUTE = (() => {
   const pts = [], n = CELL_TYPES.length;
-  const top = 150, bottom = WORLD.h - 150;
+  const left = 170, right = WORLD.w - 170;
   for (let i = 0; i < n; i++) {
-    const y = top + (bottom - top) * i / (n - 1);
-    const x = 640 + 430 * Math.sin(i * 0.92 + 0.6) + 40 * Math.sin(i * 2.3);
+    const x = left + (right - left) * i / (n - 1);
+    const y = 380 + 190 * Math.sin(i * 0.9 + 0.4) + 35 * Math.sin(i * 2.4);
     pts.push({ x: Math.round(x), y: Math.round(y) });
   }
   return pts;
@@ -154,9 +154,9 @@ const ROUTE = (() => {
 
 function buildBoard() {
   const world = $('#world');
-  $$('.scene', world).forEach((sc, i) => { sc.style.top = (i * WORLD.sceneH - 100) + 'px'; });
+  $$('.scene', world).forEach((sc, i) => { sc.style.left = (i * WORLD.sceneW - 100) + 'px'; });
   $$('.zone-label', world).forEach(z => z.remove());
-  ZONES.forEach((z, i) => world.insertAdjacentHTML('beforeend', `<div class="zone-label" style="top:${i * WORLD.sceneH + 60}px">${z}</div>`));
+  ZONES.forEach((z, i) => world.insertAdjacentHTML('beforeend', `<div class="zone-label" style="left:${i * WORLD.sceneW + 40}px">${z}</div>`));
   const wrap = $('#cells'); wrap.innerHTML = '';
   CELL_TYPES.forEach((t, i) => {
     const d = document.createElement('div');
@@ -199,7 +199,7 @@ function placePiece(p, animate = true) {
 function placeAll(animate) { S.players.forEach(p => placePiece(p, animate)); }
 
 // 카메라: 현재 탐험가를 따라가거나(기본) 전체 지도를 보여줌
-const CAM = { overview: false, target: null };
+const CAM = { overview: false, target: null, dx: 0 };
 function camera(snap = false) {
   const vp = $('#viewport').getBoundingClientRect(); if (!vp.width) return;
   const world = $('#world');
@@ -208,23 +208,31 @@ function camera(snap = false) {
     s = Math.min(vp.width / WORLD.w, vp.height / WORLD.h);
     tx = (vp.width - WORLD.w * s) / 2; ty = (vp.height - WORLD.h * s) / 2;
   } else {
-    s = Math.min(Math.max(vp.width / WORLD.w, 0.5), 0.85);
+    s = Math.min(Math.max(vp.height / WORLD.h, 0.45), 0.9);
     const pt = CAM.target || ROUTE[0];
-    tx = (vp.width - WORLD.w * s) / 2;
-    ty = vp.height / 2 - pt.y * s;
-    ty = Math.min(0, Math.max(vp.height - WORLD.h * s, ty));
+    ty = (vp.height - WORLD.h * s) / 2;
+    tx = vp.width / 2 - pt.x * s + CAM.dx;
+    tx = Math.min(0, Math.max(vp.width - WORLD.w * s, tx));
   }
   world.classList.toggle('snap', snap);
   world.style.transform = `translate(${tx}px, ${ty}px) scale(${s})`;
   if (snap) { world.offsetHeight; world.classList.remove('snap'); }
 }
-function follow(p, snap = false) { CAM.target = ROUTE[p.pos]; CAM.overview = false; $('#btn-map').classList.remove('on'); camera(snap); }
+function follow(p, snap = false) { CAM.target = ROUTE[p.pos]; CAM.overview = false; CAM.dx = 0; $('#btn-map').classList.remove('on'); camera(snap); }
 function toggleOverview() {
   CAM.overview = !CAM.overview; $('#btn-map').classList.toggle('on', CAM.overview); SFX.click();
   if (!CAM.overview) CAM.target = ROUTE[S.players[S.cur].pos];
   camera();
 }
 window.addEventListener('resize', () => { if ($('#screen-game').classList.contains('active')) camera(true); });
+// 손가락으로 지도 둘러보기 (따라가기 모드에서 좌우로 끌기)
+(() => {
+  const vp = $('#viewport'); let drag = null;
+  vp.addEventListener('pointerdown', e => { if (CAM.overview) return; drag = { x: e.clientX, dx: CAM.dx }; vp.setPointerCapture(e.pointerId); });
+  vp.addEventListener('pointermove', e => { if (!drag) return; CAM.dx = drag.dx + (e.clientX - drag.x); camera(true); });
+  const end = () => { drag = null; };
+  vp.addEventListener('pointerup', end); vp.addEventListener('pointercancel', end);
+})();
 
 function renderTop() {
   const p = S.players[S.cur];
