@@ -14,10 +14,14 @@
 - type: pattern(규칙 찾기) / shape(도형 패턴) / logic(논리 추론) / common(상식) / word(단어 퍼즐)
 - level: 1(쉬움) 2(보통) 3(어려움) · a: 정답 보기 번호(0부터)
 
-## 우리 반 랭킹(구글 시트) 연결하기
-1. 구글 시트를 새로 만들고 [확장 프로그램] → [Apps Script] 를 엽니다.
-2. `apps-script.gs` 파일 내용을 통째로 붙여 넣고 저장합니다.
-3. [배포] → [새 배포] → 웹 앱 (실행: 나 / 액세스: 모든 사용자) → 배포 → 나온 **웹 앱 URL**을 복사합니다.
-4. `game.js` 맨 위 `const RANK_URL = '';` 안에 그 주소를 넣으면 랭킹이 반 전체에 공유됩니다.
+## 우리 반 랭킹(Firebase) 연결하기
+1. https://console.firebase.google.com 에서 프로젝트 만들기 (애널리틱스는 꺼도 됨)
+2. 왼쪽 [빌드] → [Realtime Database] → 데이터베이스 만들기 (위치: 아시아, **테스트 모드**로 시작)
+3. [규칙] 탭을 아래처럼 바꾸고 게시:
+```json
+{ "rules": { "ranking": { ".read": true, ".write": true,
+  "$id": { ".validate": "newData.hasChildren(['nick','score']) && newData.child('nick').isString() && newData.child('nick').val().length <= 12 && newData.child('score').isNumber()" } } } }
+```
+4. 프로젝트 설정(⚙) → 내 앱 → 웹 앱(</>) 추가 → 나오는 `firebaseConfig` 값을 `game.js` 맨 위 `FIREBASE_CONFIG` 에 넣기
 
 연결 전에는 각 기기 안에서만 랭킹이 기록됩니다.

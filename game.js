@@ -2,9 +2,13 @@
 (() => {
 'use strict';
 
-// ───────── 랭킹 서버 설정 ─────────
-// 구글 시트(Apps Script 웹앱) 주소를 넣으면 반 전체가 공유하는 랭킹이 됩니다. 비워두면 이 기기 안에서만 기록돼요.
-const RANK_URL = '';
+// ───────── 랭킹 서버 설정 (Firebase Realtime Database) ─────────
+// 파이어베이스 콘솔 → 프로젝트 설정 → '내 앱' 의 firebaseConfig 값을 아래에 넣으면 반 전체가 공유하는 랭킹이 됩니다.
+// null 이면 이 기기 안에서만 기록돼요.
+const FIREBASE_CONFIG = null;
+const RANK_PATH = 'ranking';
+let DB = null;
+try { if (FIREBASE_CONFIG && window.firebase) { firebase.initializeApp(FIREBASE_CONFIG); DB = firebase.database(); } } catch (e) { DB = null; }
 
 // ───────── 데이터 ─────────
 const CHARS = [
@@ -472,9 +476,7 @@ function loadLocal() { try { return JSON.parse(localStorage.getItem('ti_rank') |
 function saveLocal(list) { try { localStorage.setItem('ti_rank', JSON.stringify(list.slice(0, 200))); } catch (e) {} }
 function addRecord(rec) {
   const list = loadLocal(); list.push(rec); saveLocal(list);
-  if (RANK_URL) {
-    fetch(RANK_URL, { method: 'POST', body: JSON.stringify(rec), headers: { 'Content-Type': 'text/plain' } }).catch(() => {});
-  }
+  if (DB) { try { DB.ref(RANK_PATH).push({ ...rec, ts: Date.now() }); } catch (e) {} }
 }
 function bestPer(list) {
   const m = new Map();
@@ -482,9 +484,12 @@ function bestPer(list) {
   return [...m.values()].sort((a, b) => b.score - a.score || b.stars - a.stars || a.turns - b.turns);
 }
 async function fetchShared() {
-  if (!RANK_URL) return null;
-  try { const r = await fetch(RANK_URL + '?action=top&t=' + Date.now()); const j = await r.json(); return Array.isArray(j) ? j : null; }
-  catch (e) { return null; }
+  if (!DB) return null;
+  try {
+    const snap = await Promise.race([DB.ref(RANK_PATH).orderByChild('score').limitToLast(300).once('value'), wait(6000).then(() => null)]);
+    if (!snap) return null;
+    const list = []; snap.forEach(c => { list.push(c.val()); }); return list;
+  } catch (e) { return null; }
 }
 function rankRows(list, meNick) {
   if (!list.length) return '<p class="rank-note">아직 기록이 없어요. 첫 번째 탐험가가 되어 보세요!</p>';
@@ -516,7 +521,7 @@ async function showRanking(meNick = null) {
       body.innerHTML = rankRows(b.dataset.k === 'shared' ? sv : local, meNick);
     });
   } else {
-    body.innerHTML = rankRows(local, meNick) + (RANK_URL ? '<p class="rank-note">우리 반 랭킹을 불러오지 못해 이 기기 기록만 보여요.</p>' : '<p class="rank-note">이 기기에서 세운 기록이에요.</p>');
+    body.innerHTML = rankRows(local, meNick) + (FIREBASE_CONFIG ? '<p class="rank-note">우리 반 랭킹을 불러오지 못해 이 기기 기록만 보여요.</p>' : '<p class="rank-note">이 기기에서 세운 기록이에요.</p>');
   }
 }
 
