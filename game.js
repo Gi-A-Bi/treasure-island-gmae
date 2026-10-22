@@ -5,7 +5,15 @@
 // ───────── 랭킹 서버 설정 (Firebase Realtime Database) ─────────
 // 파이어베이스 콘솔 → 프로젝트 설정 → '내 앱' 의 firebaseConfig 값을 아래에 넣으면 반 전체가 공유하는 랭킹이 됩니다.
 // null 이면 이 기기 안에서만 기록돼요.
-const FIREBASE_CONFIG = null;
+const FIREBASE_CONFIG = {
+  apiKey: "AIzaSyCVYmHv15KO7G8goViwHgTe6ez_GOKvVDo",
+  authDomain: "treasure-island-game.firebaseapp.com",
+  databaseURL: "https://treasure-island-game-default-rtdb.asia-southeast1.firebasedatabase.app",
+  projectId: "treasure-island-game",
+  storageBucket: "treasure-island-game.firebasestorage.app",
+  messagingSenderId: "812042508936",
+  appId: "1:812042508936:web:7dadbc62683d0f3cb69d3d"
+};
 const RANK_PATH = 'ranking';
 let DB = null;
 try { if (FIREBASE_CONFIG && window.firebase) { firebase.initializeApp(FIREBASE_CONFIG); DB = firebase.database(); } } catch (e) { DB = null; }
