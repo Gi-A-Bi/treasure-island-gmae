@@ -1,0 +1,119 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<title>보물섬 두뇌 탐험대</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Jua&family=Gaegu:wght@400;700&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+<!-- ───────── 타이틀 ───────── -->
+<section id="screen-title" class="screen active">
+  <div class="title-wrap">
+    <h1 class="game-title"><span>보물섬</span><span class="big">두뇌 탐험대</span></h1>
+    <p class="subtitle">주사위를 굴리고 퀴즈를 풀어 보물을 찾아라!</p>
+    <button id="btn-start" class="btn-big btn-primary">모험 시작!</button>
+    <div class="title-chars">
+      <img src="images/char_cat.png" alt="" class="float f1">
+      <img src="images/char_penguin.png" alt="" class="float f2">
+      <img src="images/char_dino.png" alt="" class="float f3">
+    </div>
+  </div>
+  <button id="btn-howto" class="btn-round corner-tl" aria-label="게임 방법">?</button>
+</section>
+
+<!-- ───────── 설정 / 캐릭터 선택 ───────── -->
+<section id="screen-setup" class="screen">
+  <div class="setup-wrap">
+    <h2>몇 명이서 할까?</h2>
+    <div class="seg" id="seg-players">
+      <button data-n="1" class="on">혼자서</button>
+      <button data-n="2">둘이서</button>
+    </div>
+
+    <h2>캐릭터를 골라요</h2>
+    <p class="hint" id="pick-hint">탐험가 1의 캐릭터를 골라요</p>
+    <div class="char-grid" id="char-grid"></div>
+
+    <h2>퀴즈 난이도</h2>
+    <div class="seg" id="seg-level">
+      <button data-l="1" class="on">★ 쉬움</button>
+      <button data-l="2">★★ 보통</button>
+      <button data-l="3">★★★ 어려움</button>
+      <button data-l="0">섞어서</button>
+    </div>
+
+    <details class="advanced">
+      <summary>⚙ 선생님 설정</summary>
+      <label class="chk"><input type="checkbox" id="opt-timer" checked> 퀴즈 제한 시간(30초) 사용</label>
+      <div class="types">
+        <label class="chk"><input type="checkbox" data-type="pattern" checked> 규칙 찾기</label>
+        <label class="chk"><input type="checkbox" data-type="shape" checked> 도형 패턴</label>
+        <label class="chk"><input type="checkbox" data-type="logic" checked> 논리 추론</label>
+        <label class="chk"><input type="checkbox" data-type="common" checked> 상식·관찰</label>
+        <label class="chk"><input type="checkbox" data-type="word" checked> 단어 퍼즐</label>
+      </div>
+    </details>
+
+    <button id="btn-go" class="btn-big btn-primary" disabled>출발!</button>
+  </div>
+  <button class="btn-round corner-tl btn-home" aria-label="처음으로">⌂</button>
+</section>
+
+<!-- ───────── 게임 ───────── -->
+<section id="screen-game" class="screen">
+  <header class="topbar">
+    <div class="turn-box" id="turn-box"></div>
+    <div class="scores" id="scores"></div>
+    <div class="top-btns">
+      <button class="btn-round btn-sound" aria-label="소리 켜기/끄기">🔊</button>
+      <button class="btn-round btn-home" aria-label="처음으로">⌂</button>
+    </div>
+  </header>
+
+  <div class="board-wrap">
+    <div class="board" id="board">
+      <div class="band zone-forest" data-zone="숲"></div>
+      <div class="band zone-beach" data-zone="해변"></div>
+      <div class="band zone-cave" data-zone="동굴"></div>
+      <div class="band zone-volcano" data-zone="화산"></div>
+      <div class="band zone-treasure" data-zone="보물 동굴"></div>
+      <div class="pieces" id="pieces"></div>
+    </div>
+  </div>
+
+  <footer class="bottombar">
+    <div class="bubble" id="bubble">주사위를 굴려 보세요!</div>
+    <div class="dice-area">
+      <div class="dice" id="dice"><div class="face" id="dice-face"></div></div>
+      <button id="btn-roll" class="btn-big btn-primary">주사위 굴리기</button>
+    </div>
+  </footer>
+</section>
+
+<!-- ───────── 결과 ───────── -->
+<section id="screen-result" class="screen">
+  <div class="confetti" id="confetti"></div>
+  <div class="result-wrap">
+    <img src="images/treasure_open.png" alt="" class="treasure pop">
+    <h2 id="result-title">보물을 찾았다!</h2>
+    <div class="result-players" id="result-players"></div>
+    <div class="result-btns">
+      <button id="btn-again" class="btn-big btn-primary">다시 하기</button>
+      <button class="btn-big btn-home">처음으로</button>
+    </div>
+  </div>
+</section>
+
+<!-- ───────── 모달 ───────── -->
+<div id="modal" class="modal" hidden>
+  <div class="modal-card" id="modal-card"></div>
+</div>
+
+<script src="quiz-data.js"></script>
+<script src="game.js"></script>
+</body>
+</html>
