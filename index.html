@@ -30,16 +30,10 @@
 <section id="screen-setup" class="screen">
   <div class="setup-wrap">
     <h2>몇 명이서 할까?</h2>
-    <div class="seg" id="seg-players">
-      <button data-n="1" class="on">혼자서</button>
-      <button data-n="2">둘이서</button>
-    </div>
+    <div class="seg" id="seg-players"><!-- 1~8명 버튼은 game.js에서 만듦 --></div>
 
     <h2>닉네임을 정해요</h2>
-    <div class="nick-row" id="nick-row">
-      <input id="nick1" class="nick" type="text" maxlength="8" placeholder="탐험가 1 닉네임" autocomplete="off">
-      <input id="nick2" class="nick" type="text" maxlength="8" placeholder="탐험가 2 닉네임" autocomplete="off" hidden>
-    </div>
+    <div class="nick-row" id="nick-row"><!-- 닉네임 칸은 인원수에 맞춰 game.js에서 만듦 --></div>
 
     <h2>캐릭터를 골라요</h2>
     <p class="hint" id="pick-hint">탐험가 1의 캐릭터를 골라요</p>

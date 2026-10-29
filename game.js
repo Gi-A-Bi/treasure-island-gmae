@@ -31,6 +31,9 @@ const CELL_TYPES = ['start','n','quiz','n','luck','quiz','n','mini','quiz','n','
 const CELL_ICON = { quiz:'images/icon_quiz.png', mini:'images/icon_minigame.png', luck:'images/icon_luck.png', trap:'images/icon_trap.png' };
 const TYPE_NAME = { pattern:'규칙 찾기', shape:'도형 패턴', logic:'논리 추론', common:'상식 퀴즈', word:'단어 퍼즐' };
 const LAST = CELL_TYPES.length - 1;
+const MAX_PLAYERS = 8;
+// 탐험가별 색 (말·닉네임·점수판에서 누구 것인지 구분)
+const PLAYER_COLORS = ['#ff6b57', '#35b6d9', '#58c15b', '#ffcc3a', '#c77dff', '#ff8fb1', '#ff9f43', '#8d99ae'];
 const LUCKS = [
   { msg:'보물 지도 발견! 3칸 앞으로!', move:3 },
   { msg:'순풍이 분다! 한 번 더 굴려요!', again:true },
@@ -40,7 +43,7 @@ const LUCKS = [
 
 // ───────── 상태 ─────────
 const S = {
-  playerCount: 1, picks: [null, null], level: 1, timer: true,
+  playerCount: 1, picks: [null], level: 1, timer: true,
   types: ['pattern','shape','logic','common','word'],
   players: [], cur: 0, busy: false, sound: true, used: new Set(),
 };
@@ -94,28 +97,29 @@ function buildSetup() {
     const card = e.target.closest('.char-card'); if (!card) return;
     SFX.click();
     const i = +card.dataset.i;
-    if (S.playerCount === 1) { S.picks = [i, null]; }
-    else {
-      if (S.picks[0] === null) S.picks[0] = i;
-      else if (S.picks[1] === null && i !== S.picks[0]) S.picks[1] = i;
-      else if (i === S.picks[0]) S.picks[0] = null;
-      else if (i === S.picks[1]) S.picks[1] = null;
-      else S.picks = [i, null];
-    }
+    const taken = S.picks.lastIndexOf(i), empty = S.picks.indexOf(null);
+    if (taken !== -1 && (!dupAllowed() || empty === -1)) S.picks[taken] = null; // 이미 고른 캐릭터를 다시 누르면 취소
+    else if (empty !== -1) S.picks[empty] = i;                                  // 아직 못 고른 탐험가에게 배정
+    else S.picks[S.picks.length - 1] = i;                                       // 모두 골랐으면 마지막 탐험가가 바꾸기
     renderPicks();
   });
-  $('#seg-players').addEventListener('click', e => {
+  const seg = $('#seg-players');
+  seg.innerHTML = Array.from({ length: MAX_PLAYERS }, (_, p) =>
+    `<button data-n="${p + 1}" class="${p === 0 ? 'on' : ''}">${['혼자서', '둘이서', '셋이서', '넷이서'][p] || (p + 1) + '명'}</button>`).join('');
+  seg.addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     SFX.click();
-    $$('#seg-players button').forEach(x => x.classList.toggle('on', x === b));
-    S.playerCount = +b.dataset.n; S.picks = [null, null]; renderPicks();
-    $('#nick2').hidden = S.playerCount === 1;
+    $$('button', seg).forEach(x => x.classList.toggle('on', x === b));
+    setPlayerCount(+b.dataset.n);
   });
+  $('#nick-row').innerHTML = Array.from({ length: MAX_PLAYERS }, (_, p) =>
+    `<input id="nick${p + 1}" class="nick" type="text" maxlength="8" placeholder="탐험가 ${p + 1} 닉네임" autocomplete="off" style="--pc:${PLAYER_COLORS[p]}">`).join('');
   try {
     const saved = JSON.parse(localStorage.getItem('ti_nicks') || '[]');
-    if (saved[0]) $('#nick1').value = saved[0]; if (saved[1]) $('#nick2').value = saved[1];
+    $$('.nick').forEach((el, p) => { if (saved[p]) el.value = saved[p]; });
   } catch (e) {}
   $$('.nick').forEach(i => i.addEventListener('input', renderPicks));
+  setPlayerCount(1);
   $('#seg-level').addEventListener('click', e => {
     const b = e.target.closest('button'); if (!b) return;
     SFX.click();
@@ -124,22 +128,31 @@ function buildSetup() {
   });
   renderPicks();
 }
+// 캐릭터(6종)보다 탐험가가 많으면 같은 캐릭터를 여럿이 골라도 됨 (말은 번호·색으로 구분)
+function dupAllowed() { return S.playerCount > CHARS.length; }
+function nickOf(p) { return $('#nick' + (p + 1)).value.trim(); }
+function setPlayerCount(n) {
+  S.playerCount = n; S.picks = Array(n).fill(null);
+  $$('.nick').forEach((el, p) => { el.hidden = p >= n; });
+  renderPicks();
+}
 function renderPicks() {
   $$('.char-card').forEach(c => {
     const i = +c.dataset.i;
-    c.classList.toggle('p1', S.picks[0] === i);
-    c.classList.toggle('p2', S.picks[1] === i);
-    const old = c.querySelector('.tag'); if (old) old.remove();
-    if (S.picks[0] === i) c.insertAdjacentHTML('beforeend', '<span class="tag">탐험가 1</span>');
-    if (S.picks[1] === i) c.insertAdjacentHTML('beforeend', '<span class="tag">탐험가 2</span>');
+    const owners = S.picks.map((v, p) => v === i ? p : -1).filter(p => p !== -1);
+    c.classList.toggle('picked', owners.length > 0);
+    c.style.setProperty('--pc', owners.length ? PLAYER_COLORS[owners[0]] : 'transparent');
+    const old = c.querySelector('.tags'); if (old) old.remove();
+    if (owners.length) c.insertAdjacentHTML('beforeend', `<span class="tags">${owners.map(p => `<span class="tag" style="background:${PLAYER_COLORS[p]}">탐험가 ${p + 1}</span>`).join('')}</span>`);
   });
-  const nickOk = $('#nick1').value.trim() && (S.playerCount === 1 || $('#nick2').value.trim());
-  const need = nickOk && (S.playerCount === 1 ? S.picks[0] !== null : S.picks[0] !== null && S.picks[1] !== null);
-  $('#btn-go').disabled = !need;
+  const missingNick = S.picks.findIndex((_, p) => !nickOf(p));
+  const missingPick = S.picks.indexOf(null);
+  $('#btn-go').disabled = missingNick !== -1 || missingPick !== -1;
   const hint = $('#pick-hint');
-  if (!nickOk) hint.textContent = '먼저 닉네임을 써 주세요';
-  else if (S.playerCount === 1) hint.textContent = S.picks[0] === null ? '캐릭터를 하나 골라요' : '좋아요! 출발 버튼을 눌러요';
-  else hint.textContent = S.picks[0] === null ? '탐험가 1의 캐릭터를 골라요' : S.picks[1] === null ? '탐험가 2의 캐릭터를 골라요' : '좋아요! 출발 버튼을 눌러요';
+  if (missingNick !== -1) hint.textContent = S.playerCount === 1 ? '먼저 닉네임을 써 주세요' : `먼저 탐험가 ${missingNick + 1}의 닉네임을 써 주세요`;
+  else if (missingPick === -1) hint.textContent = '좋아요! 출발 버튼을 눌러요';
+  else if (S.playerCount === 1) hint.textContent = '캐릭터를 하나 골라요';
+  else hint.textContent = `탐험가 ${missingPick + 1}의 캐릭터를 골라요` + (dupAllowed() ? ' (같은 캐릭터를 골라도 돼요)' : '');
 }
 
 // ───────── 게임 시작 ─────────
@@ -148,11 +161,11 @@ function startGame() {
   S.types = $$('.types input:checked').map(i => i.dataset.type);
   if (!S.types.length) S.types = Object.keys(TYPE_NAME);
   S.players = [];
-  const nicks = [$('#nick1').value.trim(), $('#nick2').value.trim()];
+  const nicks = $$('.nick').map(i => i.value.trim());
   try { localStorage.setItem('ti_nicks', JSON.stringify(nicks)); } catch (e) {}
   for (let p = 0; p < S.playerCount; p++) {
     const c = CHARS[S.picks[p]];
-    S.players.push({ idx: p, name: nicks[p] || c.name, char: c, pos: 0, stars: 0, skip: false, correct: 0, tries: 0, turns: 0 });
+    S.players.push({ idx: p, name: nicks[p] || c.name, char: c, color: PLAYER_COLORS[p], pos: 0, stars: 0, skip: false, correct: 0, tries: 0, turns: 0 });
   }
   S.cur = 0; S.busy = false; S.used = new Set();
   buildBoard(); buildPieces(); renderTop();
@@ -206,13 +219,26 @@ function drawTrail() {
   $('#trail').setAttribute('viewBox', `0 0 ${WORLD.w} ${WORLD.h}`);
   ['#road-edge', '#road', '#road-dash'].forEach(s => $(s).setAttribute('d', d));
 }
+// 한 칸에 말이 여럿 모여도 보이도록 인원수에 따라 흩어 놓고 크기를 줄임
+function pieceLayout(idx, n) {
+  if (n === 1) return { tx: -50, ty: 0, s: 1 };
+  if (n === 2) return { tx: idx === 0 ? -78 : -22, ty: 0, s: 1 };
+  const cols = n <= 4 ? 2 : 4, s = n <= 4 ? .8 : .62, step = n <= 4 ? 56 : 38;
+  const col = idx % cols, row = Math.floor(idx / cols);
+  return { tx: -50 + (col - (cols - 1) / 2) * step, ty: row * -36, s };
+}
 function buildPieces() {
   const wrap = $('#pieces'); wrap.innerHTML = '';
+  const n = S.players.length;
   S.players.forEach(p => {
     const d = document.createElement('div');
-    d.className = `piece ${S.playerCount === 1 ? 'solo' : 'p' + (p.idx + 1)}`;
+    const L = pieceLayout(p.idx, n);
+    d.className = 'piece';
     d.id = 'piece' + p.idx;
-    d.innerHTML = `<img src="${p.char.img}" alt="${p.name}">`;
+    d.style.setProperty('--tx', L.tx + '%'); d.style.setProperty('--ty', L.ty + 'px'); d.style.setProperty('--ps', L.s);
+    d.style.setProperty('--pc', p.color);
+    d.style.zIndex = 10 - Math.floor(p.idx / 4); // 앞줄 말이 뒷줄 말 위에 보이게
+    d.innerHTML = `<div class="av"><img src="${p.char.img}" alt="${p.name}">${n > 1 ? `<span class="pn">${p.idx + 1}</span>` : ''}</div>`;
     wrap.append(d);
   });
 }
@@ -261,9 +287,10 @@ window.addEventListener('resize', () => { if ($('#screen-game').classList.contai
 })();
 
 function renderTop() {
-  const p = S.players[S.cur];
-  $('#turn-box').innerHTML = `<img src="${p.char.img}" alt=""><span class="who">${p.name} 차례</span>`;
-  $('#scores').innerHTML = S.players.map(q => `<div class="sc ${q === p ? 'me' : ''}"><img src="images/icon_star.png" alt="별"> ${q.stars} <span>· ${q.pos}칸</span></div>`).join('');
+  const p = S.players[S.cur], n = S.players.length;
+  $('#turn-box').innerHTML = `<img src="${p.char.img}" alt=""><span class="who" style="--pc:${p.color}">${escapeHtml(p.name)} 차례</span>`;
+  const sc = $('#scores'); sc.classList.toggle('many', n > 4);
+  sc.innerHTML = S.players.map(q => `<div class="sc ${q === p ? 'me' : ''}" style="--pc:${q.color}">${n > 1 ? `<b class="pn">${q.idx + 1}</b>` : ''}<img class="av" src="${q.char.img}" alt="${escapeHtml(q.name)}"><img src="images/icon_star.png" alt="별"> ${q.stars} <span>· ${q.pos}칸</span></div>`).join('');
   $$('.piece').forEach(el => el.classList.toggle('active', el.id === 'piece' + p.idx));
 }
 
@@ -553,13 +580,14 @@ async function finish(winner) {
   S.players.forEach(q => { q.score = score(q); q.finished = q === winner; });
   // 승리한 탐험가(도착한 사람)만 랭킹에 기록
   addRecord({ nick: winner.name, char: winner.char.id, score: winner.score, stars: winner.stars, turns: winner.turns, correct: winner.correct, tries: winner.tries, level: S.level, date: today });
-  $('#result-players').innerHTML = ranked.map((q, i) => {
+  const rp = $('#result-players'); rp.classList.toggle('many', S.playerCount > 4);
+  rp.innerHTML = ranked.map((q, i) => {
     const g = grade(q.stars);
     const isBest = q === winner && (!prevBest.has(q.name) || prevBest.get(q.name) < q.score);
-    return `<div class="rp ${q === winner ? 'winner' : ''}" style="animation-delay:${.3 + i * .25}s">
+    return `<div class="rp ${q === winner ? 'winner' : ''}" style="animation-delay:${.3 + i * .2}s;--pc:${q.color}">
       ${S.playerCount > 1 ? `<div class="rank">${i + 1}등</div>` : ''}
       <img class="ch" src="${q.char.img}" alt="">
-      <div class="nm">${escapeHtml(q.name)}</div>
+      <div class="nm">${S.playerCount > 1 ? `<b class="pn">${q.idx + 1}</b>` : ''}${escapeHtml(q.name)}</div>
       ${q === winner ? `<div class="score">${q.score}점</div>` : ''}
       ${isBest ? '<div class="newbest">🎉 내 최고 기록!</div>' : ''}
       <div class="st">⭐ ${q.stars}개 · 퀴즈 ${q.correct}/${q.tries} · ${q.turns}턴</div>
